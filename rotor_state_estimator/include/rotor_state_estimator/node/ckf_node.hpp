@@ -113,7 +113,7 @@ class CkfNode : public rclcpp::Node
     rclcpp::Subscription<HexaCmdRaw>::SharedPtr hexa_cmd_raw_sub_{nullptr};
     rclcpp::Subscription<HexaActualRpm>::SharedPtr hexa_actual_rpm_sub_{nullptr};
 
-    rclcpp::Publisher<RotorState>::SharedPtr rotor_state_pub_{nullptr};
+    rclcpp::Publisher<HexaActualRpm>::SharedPtr rotor_state_pub_{nullptr};
     rclcpp::Publisher<RotorCov>::SharedPtr rotor_cov_pub_{nullptr};
 
     rclcpp::TimerBase::SharedPtr rotor_state_estimation_timer_{nullptr};
@@ -132,7 +132,8 @@ class CkfNode : public rclcpp::Node
     Vector12d state_est_;   // 0 ~ 5: rotor speeds, 6 ~ 11: rotor accelerations
     Vector12d state_cov_diag_;  // 0 ~ 5: rotor speed variances, 6 ~ 11: rotor acceleration variances
 
-    RotorState rotor_state_msg_;
+
+    HexaActualRpm rotor_state_msg_;
     RotorCov rotor_cov_msg_;
 
     double estimation_rate_{100.0};    // Estimation rate in Hz
