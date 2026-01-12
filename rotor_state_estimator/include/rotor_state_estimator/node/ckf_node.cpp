@@ -7,6 +7,54 @@ CkfNode::CkfNode() : Node("ckf_node")
     rpm_buffer_.reserve(30);
     cmd_rpm_buffer_.reserve(30);
 
+    std::string cmd_raw_topic = "/uav/cmd_raw";
+    std::string actual_rpm_topic = "/uav/actual_rpm";
+    std::string rotor_state_topic = "/uav/rotor_state";
+    std::string rotor_cov_topic = "/uav/rotor_state_covariance";
+
+    // Declare and get topic names from parameters
+    this->declare_parameter<std::string>("topics.hexa_cmd_raw", cmd_raw_topic);
+    this->declare_parameter<std::string>("topics.hexa_actual_rpm", actual_rpm_topic);
+    this->declare_parameter<std::string>("topics.rotor_state", rotor_state_topic);
+    this->declare_parameter<std::string>("topics.rotor_cov", rotor_cov_topic);
+
+    // Get topic names from parameters
+    cmd_raw_topic = this->get_parameter("topics.hexa_cmd_raw").as_string();
+    actual_rpm_topic = this->get_parameter("topics.hexa_actual_rpm").as_string();
+    rotor_state_topic = this->get_parameter("topics.rotor_state").as_string();
+    rotor_cov_topic = this->get_parameter("topics.rotor_cov").as_string();
+
+    // Subscribers
+    hexa_cmd_raw_sub_ = this->create_subscription<HexaCmdRaw>(
+        cmd_raw_topic,
+        rclcpp::QoS(5),
+        std::bind(&CkfNode::hexaCmdRawCallback, this, std::placeholders::_1)
+    ); 
+
+    hexa_actual_rpm_sub_ = this->create_subscription<HexaActualRpm>(
+        actual_rpm_topic,
+        rclcpp::SensorDataQoS(),
+        std::bind(&CkfNode::hexaActualRpmCallback, this, std::placeholders::_1)
+    );
+
+    // Timer for rotor state estimation loop
+    double timer_period = 1.0 / estimation_rate_; // seconds
+    rotor_state_estimation_timer_ = this->create_wall_timer(
+        std::chrono::duration<double>(timer_period),
+        std::bind(&CkfNode::RotorStateEstimationLoopCallback, this)
+    );
+
+    // Publishers
+    rotor_state_pub_ = this->create_publisher<RotorState>(
+        rotor_state_topic,
+        rclcpp::QoS(10)
+    );
+
+    rotor_cov_pub_ = this->create_publisher<RotorCov>(
+        rotor_cov_topic,
+        rclcpp::QoS(10)
+    );
+
 
 }
 
@@ -88,15 +136,24 @@ void CkfNode::load_parameters()
 
     // 4. Estimation rate
     this->declare_parameter<double>("ckf.estimation_rate", 100.0);
-    estimation_rate_ = this->get_parameter("estimation_rate").as_double();
+    estimation_rate_ = this->get_parameter("ckf.estimation_rate").as_double();
 
 
     for(size_t i = 0; i < 6; ++i)
     {
+        // Create CKF instance for each rotor
+        RCLCPP_INFO(this->get_logger(), "Creating CKF instance for rotor %zu", i);
         ckf_[i] = new ConstrainedKf(motor_params,
                                     process_noise_cov,
                                     measurement_noise_cov,
                                     initial_cov);
+        
+        // Initialize rotor state with idle command RPM
+        double w_rotor_init = idle_cmd_bit_ / max_bit_ * max_rpm_;
+        RCLCPP_INFO(this->get_logger(), "Initializing rotor %zu state with %.2f RPM", i, w_rotor_init);
+
+        ckf_[i]->initialize_state(w_rotor_init);
+
     }
 
     print_parameters(motor_params,
@@ -269,6 +326,8 @@ Vector6d CkfNode::get_cmd_near_timestamp(const double& timestamp)
     double idle_cmd_rpm = (idle_cmd_bit_ / max_bit_) * max_rpm_;
     cmd_near << idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm,
                 idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm;
+
+    RCLCPP_INFO(this->get_logger(), "No command RPM data found near timestamp %.6f. Returning idle command RPM.", timestamp);
     return cmd_near;
 }
 
