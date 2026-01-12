@@ -186,14 +186,41 @@ void CkfNode::estimate_rotor_states()
     Vector6d cmd_recent = get_cmd_near_timestamp(rpm_recent.timestamp);
     Vector6d cmd_med = (cmd_before + cmd_recent) / 2.0;
 
+    double dt = rpm_recent.timestamp - rpm_before.timestamp;
+    
+    if (dt <= 0.0)
+    {
+        RCLCPP_WARN(this->get_logger(), "Non-positive time difference between RPM measurements.");
+        return;
+    }
+
+    for (size_t i = 0; i < 6; ++i)
+    {
+        // Prediction step
+        ckf_[i]->predict(cmd_med(i), dt);
+
+        // Update step with the most recent RPM measurement
+        ckf_[i]->update(rpm_recent.rpm(i));
+
+        // Store estimated states and covariances
+        state_est_(i) = ckf_[i]->get_state_estimate()(0);          // Rotor speed
+        state_est_(i + 6) = ckf_[i]->get_state_estimate()(1);      // Rotor acceleration
+
+        state_cov_diag_(i) = ckf_[i]->get_covariance_estimate()(0, 0);      // Rotor speed variance
+        state_cov_diag_(i + 6) = ckf_[i]->get_covariance_estimate()(1, 1);  // Rotor acceleration variance
+    }
 
 }
 
 Vector6d CkfNode::get_cmd_near_timestamp(const double& timestamp)
 {
-    if (cmd_rpm_buffer_.empty())
+    if (cmd_rpm_buffer_.is_empty())
     {
-        return Vector6d::Zero();
+        Vector6d cmd_near;
+        double idle_cmd_rpm = (idle_cmd_bit_ / max_bit_) * max_rpm_;
+        cmd_near << idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm,
+                    idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm;
+        return cmd_near;
     }
 
     // Find the two commands that bracket the timestamp
@@ -238,7 +265,11 @@ Vector6d CkfNode::get_cmd_near_timestamp(const double& timestamp)
     }
 
     // If nothing found, return zero
-    return Vector6d::Zero();
+    Vector6d cmd_near;
+    double idle_cmd_rpm = (idle_cmd_bit_ / max_bit_) * max_rpm_;
+    cmd_near << idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm,
+                idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm;
+    return cmd_near;
 }
 
 Vector6d CkfNode::rpm_linear_interpolation(const RpmData& before, const RpmData& after,

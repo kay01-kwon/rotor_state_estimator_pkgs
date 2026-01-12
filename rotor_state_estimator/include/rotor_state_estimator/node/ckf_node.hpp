@@ -126,6 +126,8 @@ class CkfNode : public rclcpp::Node
 
     double max_rpm_{9800.0};  // Maximum RPM for normalization
     double max_bit_{8191.0}; // Maximum bit value for normalization
+
+    double idle_cmd_bit_{2000.0}; // Idle command in bit value
     
     Vector12d state_est_;   // 0 ~ 5: rotor speeds, 6 ~ 11: rotor accelerations
     Vector12d state_cov_diag_;  // 0 ~ 5: rotor speed variances, 6 ~ 11: rotor acceleration variances
