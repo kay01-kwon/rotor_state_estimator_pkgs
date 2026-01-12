@@ -116,7 +116,7 @@ class CkfNode : public rclcpp::Node
     rclcpp::Publisher<RotorState>::SharedPtr rotor_state_pub_{nullptr};
     rclcpp::Publisher<RotorCov>::SharedPtr rotor_cov_pub_{nullptr};
 
-    rclcpp::TimerBase::SharedPtr timer_{nullptr};
+    rclcpp::TimerBase::SharedPtr rotor_state_estimation_timer_{nullptr};
 
     CircularBuffer<RpmData> rpm_buffer_;
     CircularBuffer<RpmData> cmd_rpm_buffer_;

@@ -15,3 +15,9 @@
       measurement_noise_cov: 255.0 # rotor speed measurement noise covariance
       initial_state_cov: [100.0, 1000.0] # initial state covariance
       estimation_rate: 100.0  # estimation rate in Hz
+    
+    topics:
+      hexa_cmd_raw: "/uav/cmd_raw"
+      hexa_actual_rpm: "/uav/actual_rpm"
+      rotor_state: "/uav/rotor_state"
+      rotor_cov: "/uav/rotor_state_covariance"
