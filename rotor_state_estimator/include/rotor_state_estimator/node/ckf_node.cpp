@@ -45,9 +45,9 @@ CkfNode::CkfNode() : Node("ckf_node")
     );
 
     // Publishers
-    rotor_state_pub_ = this->create_publisher<RotorState>(
+    rotor_state_pub_ = this->create_publisher<HexaActualRpm>(
         rotor_state_topic,
-        rclcpp::QoS(10)
+        rclcpp::SensorDataQoS()
     );
 
     rotor_cov_pub_ = this->create_publisher<RotorCov>(
@@ -362,8 +362,8 @@ void CkfNode::RotorStateEstimationLoopCallback()
 
     for(size_t i = 0; i < 6; ++i)
     {
-        rotor_state_msg_.rotor_speed[i] = static_cast<int32_t>(state_est_(i));
-        rotor_state_msg_.rotor_acceleration[i] = static_cast<int32_t>(state_est_(i + 6));
+        rotor_state_msg_.rpm[i] = static_cast<int32_t>(state_est_(i));
+        rotor_state_msg_.acceleration[i] = static_cast<int32_t>(state_est_(i + 6));
 
         rotor_cov_msg_.diag_cov[i] = state_cov_diag_(i);
         rotor_cov_msg_.diag_cov[i + 6] = state_cov_diag_(i + 6);
