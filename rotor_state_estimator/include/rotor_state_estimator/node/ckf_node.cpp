@@ -27,13 +27,13 @@ CkfNode::CkfNode() : Node("ckf_node")
     // Subscribers
     hexa_cmd_raw_sub_ = this->create_subscription<HexaCmdRaw>(
         cmd_raw_topic,
-        rclcpp::QoS(10),
+        rclcpp::QoS(5),
         std::bind(&CkfNode::hexaCmdRawCallback, this, std::placeholders::_1)
     ); 
 
     hexa_actual_rpm_sub_ = this->create_subscription<HexaActualRpm>(
         actual_rpm_topic,
-        rclcpp::QoS(10),
+        rclcpp::SensorDataQoS(),
         std::bind(&CkfNode::hexaActualRpmCallback, this, std::placeholders::_1)
     );
 
@@ -136,7 +136,7 @@ void CkfNode::load_parameters()
 
     // 4. Estimation rate
     this->declare_parameter<double>("ckf.estimation_rate", 100.0);
-    estimation_rate_ = this->get_parameter("estimation_rate").as_double();
+    estimation_rate_ = this->get_parameter("ckf.estimation_rate").as_double();
 
 
     for(size_t i = 0; i < 6; ++i)
@@ -326,6 +326,8 @@ Vector6d CkfNode::get_cmd_near_timestamp(const double& timestamp)
     double idle_cmd_rpm = (idle_cmd_bit_ / max_bit_) * max_rpm_;
     cmd_near << idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm,
                 idle_cmd_rpm, idle_cmd_rpm, idle_cmd_rpm;
+
+    RCLCPP_INFO(this->get_logger(), "No command RPM data found near timestamp %.6f. Returning idle command RPM.", timestamp);
     return cmd_near;
 }
 

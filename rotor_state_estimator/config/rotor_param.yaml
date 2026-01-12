@@ -11,8 +11,8 @@
       jerk_max: 250000.0
 
     ckf:
-      process_noise_cov: [1e-1, 10.0] # order: [rotor speed, rotor acceleration]
-      measurement_noise_cov: 255.0 # rotor speed measurement noise covariance
+      process_noise_cov: [0.1, 10.0] # order: [rotor speed, rotor acceleration]
+      measurement_noise_cov: 225.0 # rotor speed measurement noise covariance
       initial_state_cov: [100.0, 1000.0] # initial state covariance
       estimation_rate: 100.0  # estimation rate in Hz
     

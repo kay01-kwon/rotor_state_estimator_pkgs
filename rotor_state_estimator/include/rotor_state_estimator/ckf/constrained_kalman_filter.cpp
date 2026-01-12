@@ -113,7 +113,7 @@ void ConstrainedKf::predict(const double& u_cmd, const double &dt)
     double alpha_est_prev = state_estimate_(1);
 
     // Compute physical jerk based on motor model
-    j_eff = -(motor_params_.p1 + motor_params_.p2 * w_est_prev)
+    j_eff = -(motor_params_.p1 + motor_params_.p2 * w_est_prev) * alpha_est_prev
     - motor_params_.p3 * (w_est_prev - u_cmd);
 
     // Apply jerk constraints
@@ -129,7 +129,7 @@ void ConstrainedKf::predict(const double& u_cmd, const double &dt)
         A_(0,0) = 1.0;
         A_(0,1) = 0.0;
         A_(1,0) = 0.0;
-        A_(1,1) = 1.0;
+        A_(1,1) = 0.0;
         
     }
     else if(alpha_est_prev <= -motor_params_.alpha_max && j_eff < 0)
@@ -139,7 +139,7 @@ void ConstrainedKf::predict(const double& u_cmd, const double &dt)
         A_(0,0) = 1.0;
         A_(0,1) = 0.0;
         A_(1,0) = 0.0;
-        A_(1,1) = 1.0;
+        A_(1,1) = 0.0;
     }
     else
     {
@@ -149,7 +149,7 @@ void ConstrainedKf::predict(const double& u_cmd, const double &dt)
         // Linearized state transition matrix entries
         A_(0,0) = 1.0;
         A_(0,1) = dt;
-        A_(1,0) = (-motor_params_.p2 - motor_params_.p3) * dt;
+        A_(1,0) = (-motor_params_.p2*alpha_est_prev - motor_params_.p3) * dt;
         A_(1,1) = 1.0 - (motor_params_.p1 + motor_params_.p2 * w_est_prev) * dt;
     }
 
@@ -220,7 +220,7 @@ void ConstrainedKf::update(const double& measurement)
         }
 
         // Extract the row of D_ corresponding to the most violated constraint
-        Matrix1x4d D_i = D_.row(max_index);
+        Matrix1x2d D_i = D_.row(max_index);
 
         // Maximum A Posteriori (MAP) correction
         double den = D_i * P_ * D_i.transpose();
