@@ -9,7 +9,7 @@ CkfNode::CkfNode() : Node("ckf_node")
 
     std::string cmd_raw_topic = "/uav/cmd_raw";
     std::string actual_rpm_topic = "/uav/actual_rpm";
-    std::string rotor_state_topic = "/uav/filtered_rpm";
+    std::string rotor_state_topic = "/uav/rotor_state";
     std::string rotor_cov_topic = "/uav/rotor_state_covariance";
 
     // Declare and get topic names from parameters
