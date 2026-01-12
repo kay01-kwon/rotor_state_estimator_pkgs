@@ -93,11 +93,20 @@ class CkfNode : public rclcpp::Node
 
     /**
      * @brief Timer callback function for the rotor state estimation loop.
-     * 
+     *
      */
     void RotorStateEstimationLoopCallback();
 
-
+    /**
+     * @brief Convert ROS timestamp to double (seconds).
+     *
+     * @param stamp ROS timestamp.
+     * @return double Time in seconds.
+     */
+    inline double toSeconds(const builtin_interfaces::msg::Time& stamp) const
+    {
+        return static_cast<double>(stamp.sec) + static_cast<double>(stamp.nanosec) * 1e-9;
+    }
 
     ConstrainedKf* ckf_[6];
     

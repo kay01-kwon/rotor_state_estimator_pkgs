@@ -133,17 +133,15 @@ void CkfNode::print_parameters(const SecondOrderMotorParams motor_params,
 
 void CkfNode::hexaCmdRawCallback(const HexaCmdRaw::SharedPtr msg)
 {
-    // Implementation for handling received HexaCmdRaw messages
     RpmData cmd_data;
-    cmd_data.timestamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+    cmd_data.timestamp = toSeconds(msg->header.stamp);
 
     for (size_t i = 0; i < 6; ++i)
     {
-        // Normalize the command from bit to RPM
-        cmd_data.rpm[i] = static_cast<double>((static_cast<double>(msg->cmd_raw[i]) / max_bit_) * max_rpm_);
+        cmd_data.rpm[i] = (static_cast<double>(msg->cmd_raw[i]) / max_bit_) * max_rpm_;
     }
 
-    if(cmd_rpm_buffer_.is_full())
+    if (cmd_rpm_buffer_.is_full())
     {
         cmd_rpm_buffer_.pop();
     }
@@ -153,23 +151,22 @@ void CkfNode::hexaCmdRawCallback(const HexaCmdRaw::SharedPtr msg)
 
 void CkfNode::hexaActualRpmCallback(const HexaActualRpm::SharedPtr msg)
 {
-    // Implementation for handling received HexaActualRpm messages
     RpmData rpm_data;
-    rpm_data.timestamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+    rpm_data.timestamp = toSeconds(msg->header.stamp);
 
     for (size_t i = 0; i < 6; ++i)
     {
         rpm_data.rpm[i] = static_cast<double>(msg->rpm[i]);
     }
 
-    if(rpm_buffer_.is_full())
+    if (rpm_buffer_.is_full())
     {
         rpm_buffer_.pop();
     }
 
     rpm_buffer_.push_back(rpm_data);
 
-    if(rpm_buffer_.size() >= 2 && cmd_rpm_buffer_.size() >= 2)
+    if (rpm_buffer_.size() >= 2 && cmd_rpm_buffer_.size() >= 2)
     {
         estimate_rotor_states();
     }
@@ -194,31 +191,72 @@ void CkfNode::estimate_rotor_states()
 
 Vector6d CkfNode::get_cmd_near_timestamp(const double& timestamp)
 {
-    // Implementation to get the command nearest to the given timestamp
-    size_t cmd_recent_idx = cmd_rpm_buffer_.size() - 1;
+    if (cmd_rpm_buffer_.empty())
+    {
+        return Vector6d::Zero();
+    }
 
+    // Find the two commands that bracket the timestamp
+    std::optional<RpmData> before_data;
+    std::optional<RpmData> after_data;
 
-    return cmd_near;
+    for (size_t i = 0; i < cmd_rpm_buffer_.size(); ++i)
+    {
+        auto cmd_data = cmd_rpm_buffer_.at(i);
+        if (!cmd_data.has_value())
+        {
+            continue;
+        }
+
+        if (cmd_data->timestamp <= timestamp)
+        {
+            before_data = cmd_data.value();
+        }
+        else if (cmd_data->timestamp > timestamp && !after_data.has_value())
+        {
+            after_data = cmd_data.value();
+            break;
+        }
+    }
+
+    // If we have both before and after, interpolate
+    if (before_data.has_value() && after_data.has_value())
+    {
+        return rpm_linear_interpolation(before_data.value(), after_data.value(), timestamp);
+    }
+
+    // If we only have before, return it
+    if (before_data.has_value())
+    {
+        return before_data->rpm;
+    }
+
+    // If we only have after, return it
+    if (after_data.has_value())
+    {
+        return after_data->rpm;
+    }
+
+    // If nothing found, return zero
+    return Vector6d::Zero();
 }
 
-Vector6d CkfNode::rpm_linear_interpolation(const RpmData& before, const RpmData& after, 
+Vector6d CkfNode::rpm_linear_interpolation(const RpmData& before, const RpmData& after,
     const double& timestamp)
 {
-    // Implementation for linear interpolation between two RpmData points
-
-    Vector6int16 interpolated_rpm;
-    double time_diff = after.timestamp - before.timestamp;
+    const double time_diff = after.timestamp - before.timestamp;
 
     if (time_diff <= 0.0)
     {
-        // If timestamps are the same or invalid, return the 'before' RPM values
         return before.rpm;
     }
 
-    double factor = (timestamp - before.timestamp) / time_diff;
+    const double factor = (timestamp - before.timestamp) / time_diff;
+
+    Vector6d interpolated_rpm;
     for (size_t i = 0; i < 6; ++i)
     {
-        interpolated_rpm[i] = static_cast<int16_t>(before.rpm[i] + factor * (after.rpm[i] - before.rpm[i]));
+        interpolated_rpm[i] = before.rpm[i] + factor * (after.rpm[i] - before.rpm[i]);
     }
 
     return interpolated_rpm;
