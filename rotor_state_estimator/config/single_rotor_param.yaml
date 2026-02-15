@@ -1,0 +1,23 @@
+/**:
+  ros__parameters:
+    motor:
+      rotor_index: 0  # which rotor to estimate (0-5)
+      p1: 25.16687
+      p2: 0.003933
+      p3: 515.605
+      w_min: 2000.0
+      w_max: 7300.0
+      alpha_max: 15000.0
+      jerk_max: 250000.0
+
+    ckf:
+      process_noise_cov: [0.1, 10.0] # order: [rotor speed, rotor acceleration]
+      measurement_noise_cov: 225.0 # rotor speed measurement noise covariance
+      initial_state_cov: [100.0, 1000.0] # initial state covariance
+      estimation_rate: 100.0  # estimation rate in Hz
+
+    topics:
+      hexa_cmd_raw: "/uav/cmd_raw"
+      hexa_actual_rpm: "/uav/actual_rpm"
+      single_rotor_state: "/uav/single_rotor_state"
+      single_rotor_cov: "/uav/single_rotor_state_covariance"

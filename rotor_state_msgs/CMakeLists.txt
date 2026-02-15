@@ -14,6 +14,8 @@ rosidl_generate_interfaces(
   ${PROJECT_NAME}
   "msg/RotorState.msg"
   "msg/RotorCov.msg"
+  "msg/SingleRotorState.msg"
+  "msg/SingleRotorCov.msg"
   DEPENDENCIES std_msgs
 )
 

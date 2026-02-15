@@ -41,4 +41,10 @@ struct RpmData
     Vector6d rpm{Vector6d::Zero()};
 };
 
+struct SingleRpmData
+{
+    double timestamp{0.0};
+    double rpm{0.0};
+};
+
 #endif // STATE_DEF_HPP
