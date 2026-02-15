@@ -25,16 +25,16 @@ SingleRotorCkfNode::SingleRotorCkfNode() : Node("single_rotor_ckf_node")
     rotor_cov_topic = this->get_parameter("topics.single_rotor_cov").as_string();
 
     // Subscribers
-    hexa_cmd_raw_sub_ = this->create_subscription<HexaCmdRaw>(
+    hexa_cmd_raw_sub_ = this->create_subscription<SingleCmdRaw>(
         cmd_raw_topic,
         rclcpp::QoS(5),
-        std::bind(&SingleRotorCkfNode::hexaCmdRawCallback, this, std::placeholders::_1)
+        std::bind(&SingleRotorCkfNode::singleCmdRawCallback, this, std::placeholders::_1)
     );
 
-    hexa_actual_rpm_sub_ = this->create_subscription<HexaActualRpm>(
+    hexa_actual_rpm_sub_ = this->create_subscription<SingleActualRpm>(
         actual_rpm_topic,
         rclcpp::SensorDataQoS(),
-        std::bind(&SingleRotorCkfNode::hexaActualRpmCallback, this, std::placeholders::_1)
+        std::bind(&SingleRotorCkfNode::singleActualRpmCallback, this, std::placeholders::_1)
     );
 
     // Timer for rotor state estimation loop
@@ -45,7 +45,7 @@ SingleRotorCkfNode::SingleRotorCkfNode() : Node("single_rotor_ckf_node")
     );
 
     // Publishers
-    rotor_state_pub_ = this->create_publisher<SingleRotorState>(
+    rotor_state_pub_ = this->create_publisher<SingleActualRpm>(
         rotor_state_topic,
         rclcpp::SensorDataQoS()
     );
@@ -190,13 +190,13 @@ void SingleRotorCkfNode::print_parameters(const SecondOrderMotorParams motor_par
     RCLCPP_INFO(this->get_logger(), "----------------------------------------------");
 }
 
-void SingleRotorCkfNode::hexaCmdRawCallback(const HexaCmdRaw::SharedPtr msg)
+void SingleRotorCkfNode::singleCmdRawCallback(const SingleCmdRaw::SharedPtr msg)
 {
     SingleRpmData cmd_data;
     cmd_data.timestamp = toSeconds(msg->header.stamp);
 
     // Extract only the target rotor's command
-    cmd_data.rpm = (static_cast<double>(msg->cmd_raw[rotor_index_]) / max_bit_) * max_rpm_;
+    cmd_data.rpm = (static_cast<double>(msg->cmd_raw) / max_bit_) * max_rpm_;
 
     if (cmd_rpm_buffer_.is_full())
     {
@@ -206,13 +206,13 @@ void SingleRotorCkfNode::hexaCmdRawCallback(const HexaCmdRaw::SharedPtr msg)
     cmd_rpm_buffer_.push_back(cmd_data);
 }
 
-void SingleRotorCkfNode::hexaActualRpmCallback(const HexaActualRpm::SharedPtr msg)
+void SingleRotorCkfNode::singleActualRpmCallback(const SingleActualRpm::SharedPtr msg)
 {
     SingleRpmData rpm_data;
     rpm_data.timestamp = toSeconds(msg->header.stamp);
 
     // Extract only the target rotor's RPM
-    rpm_data.rpm = static_cast<double>(msg->rpm[rotor_index_]);
+    rpm_data.rpm = static_cast<double>(msg->rpm);
 
     if (rpm_buffer_.is_full())
     {
@@ -338,8 +338,8 @@ void SingleRotorCkfNode::RotorStateEstimationLoopCallback()
     rotor_state_msg_.header.stamp = this->now();
     rotor_cov_msg_.header.stamp = this->now();
 
-    rotor_state_msg_.rotor_speed = static_cast<int32_t>(state_est_speed_);
-    rotor_state_msg_.rotor_acceleration = static_cast<int32_t>(state_est_accel_);
+    rotor_state_msg_.rpm = static_cast<int32_t>(state_est_speed_);
+    rotor_state_msg_.acceleration = static_cast<int32_t>(state_est_accel_);
 
     rotor_cov_msg_.diag_cov[0] = state_cov_speed_;
     rotor_cov_msg_.diag_cov[1] = state_cov_accel_;

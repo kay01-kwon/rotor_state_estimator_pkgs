@@ -9,16 +9,15 @@
 #include "rotor_state_estimator/ckf/constrained_kalman_filter.hpp"
 #include "rotor_state_estimator/utils/CircularBuffer.hpp"
 
-#include <ros2_libcanard_msgs/msg/hexa_cmd_raw.hpp>
-#include <ros2_libcanard_msgs/msg/hexa_actual_rpm.hpp>
+#include <ros2_libcanard_msgs/msg/single_cmd_raw.hpp>
+#include <ros2_libcanard_msgs/msg/single_actual_rpm.hpp>
 
-#include <rotor_state_msgs/msg/single_rotor_state.hpp>
 #include <rotor_state_msgs/msg/single_rotor_cov.hpp>
 
-using ros2_libcanard_msgs::msg::HexaCmdRaw;
-using ros2_libcanard_msgs::msg::HexaActualRpm;
 
-using rotor_state_msgs::msg::SingleRotorState;
+using ros2_libcanard_msgs::msg::SingleCmdRaw;
+using ros2_libcanard_msgs::msg::SingleActualRpm;
+
 using rotor_state_msgs::msg::SingleRotorCov;
 
 class SingleRotorCkfNode : public rclcpp::Node
@@ -57,15 +56,15 @@ class SingleRotorCkfNode : public rclcpp::Node
      *
      * @param msg Shared pointer to the received HexaCmdRaw message.
      */
-    void hexaCmdRawCallback(const HexaCmdRaw::SharedPtr msg);
+    void singleCmdRawCallback(const SingleCmdRaw::SharedPtr msg);
 
     /**
      * @brief Callback function for receiving actual hexacopter RPM messages.
      * Extracts only the rotor at rotor_index_.
      *
-     * @param msg Shared pointer to the received HexaActualRpm message.
+     * @param msg Shared pointer to the received SingleActualRpm message.
      */
-    void hexaActualRpmCallback(const HexaActualRpm::SharedPtr msg);
+    void singleActualRpmCallback(const SingleActualRpm::SharedPtr msg);
 
     /**
      * @brief Estimate the single rotor state using the constrained Kalman filter.
@@ -111,10 +110,10 @@ class SingleRotorCkfNode : public rclcpp::Node
 
     int rotor_index_{0};  // Index of the rotor to estimate (0-5)
 
-    rclcpp::Subscription<HexaCmdRaw>::SharedPtr hexa_cmd_raw_sub_{nullptr};
-    rclcpp::Subscription<HexaActualRpm>::SharedPtr hexa_actual_rpm_sub_{nullptr};
+    rclcpp::Subscription<SingleCmdRaw>::SharedPtr hexa_cmd_raw_sub_{nullptr};
+    rclcpp::Subscription<SingleActualRpm>::SharedPtr hexa_actual_rpm_sub_{nullptr};
 
-    rclcpp::Publisher<SingleRotorState>::SharedPtr rotor_state_pub_{nullptr};
+    rclcpp::Publisher<SingleActualRpm>::SharedPtr rotor_state_pub_{nullptr};
     rclcpp::Publisher<SingleRotorCov>::SharedPtr rotor_cov_pub_{nullptr};
 
     rclcpp::TimerBase::SharedPtr rotor_state_estimation_timer_{nullptr};
@@ -135,7 +134,7 @@ class SingleRotorCkfNode : public rclcpp::Node
     double state_cov_speed_{0.0};
     double state_cov_accel_{0.0};
 
-    SingleRotorState rotor_state_msg_;
+    SingleActualRpm rotor_state_msg_;
     SingleRotorCov rotor_cov_msg_;
 
     double estimation_rate_{100.0};    // Estimation rate in Hz

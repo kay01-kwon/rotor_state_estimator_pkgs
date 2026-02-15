@@ -18,7 +18,6 @@
 using ros2_libcanard_msgs::msg::HexaCmdRaw;
 using ros2_libcanard_msgs::msg::HexaActualRpm;
 
-using rotor_state_msgs::msg::RotorState;
 using rotor_state_msgs::msg::RotorCov;
 
 class CkfNode : public rclcpp::Node
