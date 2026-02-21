@@ -72,12 +72,30 @@ class ConstrainedKf
 
     /**
      * @brief Get the current state estimate.
-     * 
+     *
      * @return StateVector Current state estimate vector.
      */
     Vector2d get_state_estimate() const;
 
     Matrix2x2d get_covariance_estimate() const;
+
+    /**
+     * @brief Get the predicted state (before measurement update).
+     * Valid after calling predict().
+     */
+    Vector2d get_predicted_state() const;
+
+    /**
+     * @brief Get the predicted covariance (before measurement update).
+     * Valid after calling predict().
+     */
+    Matrix2x2d get_predicted_covariance() const;
+
+    /**
+     * @brief Get the linearized state transition matrix.
+     * Valid after calling predict().
+     */
+    Matrix2x2d get_transition_matrix() const;
 
     private:
 
@@ -93,6 +111,7 @@ class ConstrainedKf
     double u_cmd_;    // Control input vector (commanded angular velocities)
     
     Matrix2x2d P_;  // Estimate covariance matrix
+    Matrix2x2d P_pred_;  // Predicted covariance (before measurement update)
     Matrix2x2d A_;  // State transition matrix
 
     Matrix1x2d H_;  // Measurement matrix

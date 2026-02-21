@@ -16,6 +16,11 @@
       initial_state_cov: [100.0, 1000.0] # initial state covariance
       estimation_rate: 100.0  # estimation rate in Hz
 
+    rts:
+      enable: true       # enable RTS fixed-lag smoother
+      window_size: 20    # number of forward-pass steps kept for backward smoothing
+      lag: 5             # output delay in steps (higher = more smoothing, more latency)
+
     topics:
       hexa_cmd_raw: "/uav/cmd_raw"
       hexa_actual_rpm: "/uav/actual_rpm"
