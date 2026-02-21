@@ -167,6 +167,9 @@ void ConstrainedKf::predict(const double& u_cmd, const double &dt)
 
     // Update Covariance matrix
     P_ = A_ * P_ * A_.transpose() + Q_;
+
+    // Save predicted covariance for RTS smoother
+    P_pred_ = P_;
 }
 
 void ConstrainedKf::update(const double& measurement)
@@ -251,8 +254,22 @@ Matrix2x2d ConstrainedKf::get_covariance_estimate() const
     return P_;
 }
 
-
 Vector2d ConstrainedKf::get_state_estimate() const
 {
     return state_estimate_;
+}
+
+Vector2d ConstrainedKf::get_predicted_state() const
+{
+    return state_prediction_;
+}
+
+Matrix2x2d ConstrainedKf::get_predicted_covariance() const
+{
+    return P_pred_;
+}
+
+Matrix2x2d ConstrainedKf::get_transition_matrix() const
+{
+    return A_;
 }

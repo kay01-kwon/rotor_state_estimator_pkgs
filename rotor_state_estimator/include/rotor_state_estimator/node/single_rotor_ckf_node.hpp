@@ -7,6 +7,7 @@
 #include <string>
 
 #include "rotor_state_estimator/ckf/constrained_kalman_filter.hpp"
+#include "rotor_state_estimator/ckf/rts_smoother.hpp"
 #include "rotor_state_estimator/utils/CircularBuffer.hpp"
 
 #include <ros2_libcanard_msgs/msg/single_cmd_raw.hpp>
@@ -107,8 +108,12 @@ class SingleRotorCkfNode : public rclcpp::Node
     }
 
     ConstrainedKf* ckf_{nullptr};
+    RtsSmoother* rts_smoother_{nullptr};
 
     int rotor_index_{0};  // Index of the rotor to estimate (0-5)
+    bool use_smoother_{true};
+    int smoother_window_{20};
+    int smoother_lag_{5};
 
     rclcpp::Subscription<SingleCmdRaw>::SharedPtr hexa_cmd_raw_sub_{nullptr};
     rclcpp::Subscription<SingleActualRpm>::SharedPtr hexa_actual_rpm_sub_{nullptr};

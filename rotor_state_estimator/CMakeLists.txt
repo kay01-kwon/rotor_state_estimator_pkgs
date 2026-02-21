@@ -5,11 +5,13 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(ckf_src
   include/rotor_state_estimator/ckf/constrained_kalman_filter.cpp
+  include/rotor_state_estimator/ckf/rts_smoother.cpp
   include/rotor_state_estimator/node/ckf_node.cpp
 )
 
 set(single_ckf_src
   include/rotor_state_estimator/ckf/constrained_kalman_filter.cpp
+  include/rotor_state_estimator/ckf/rts_smoother.cpp
   include/rotor_state_estimator/node/single_rotor_ckf_node.cpp
 )
 

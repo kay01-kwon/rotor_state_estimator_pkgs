@@ -60,10 +60,11 @@ CkfNode::CkfNode() : Node("ckf_node")
 
 CkfNode::~CkfNode()
 {
-    // Delete CKF instances
+    // Delete CKF and RTS smoother instances
     for (int i = 0; i < 6; ++i)
     {
         delete ckf_[i];
+        delete rts_smoother_[i];
     }
 }
 
@@ -138,6 +139,15 @@ void CkfNode::load_parameters()
     this->declare_parameter<double>("ckf.estimation_rate", 100.0);
     estimation_rate_ = this->get_parameter("ckf.estimation_rate").as_double();
 
+    // 5. RTS smoother parameters
+    this->declare_parameter<bool>("rts.enable", true);
+    use_smoother_ = this->get_parameter("rts.enable").as_bool();
+
+    this->declare_parameter<int>("rts.window_size", 20);
+    smoother_window_ = this->get_parameter("rts.window_size").as_int();
+
+    this->declare_parameter<int>("rts.lag", 5);
+    smoother_lag_ = this->get_parameter("rts.lag").as_int();
 
     for(size_t i = 0; i < 6; ++i)
     {
@@ -147,14 +157,24 @@ void CkfNode::load_parameters()
                                     process_noise_cov,
                                     measurement_noise_cov,
                                     initial_cov);
-        
+
         // Initialize rotor state with idle command RPM
         double w_rotor_init = idle_cmd_bit_ / max_bit_ * max_rpm_;
         RCLCPP_INFO(this->get_logger(), "Initializing rotor %zu state with %.2f RPM", i, w_rotor_init);
 
         ckf_[i]->initialize_state(w_rotor_init);
 
+        // Create RTS smoother for each rotor
+        if (use_smoother_)
+        {
+            rts_smoother_[i] = new RtsSmoother(
+                static_cast<size_t>(smoother_window_), motor_params);
+        }
     }
+
+    RCLCPP_INFO(this->get_logger(),
+        "RTS smoother: %s (window=%d, lag=%d)",
+        use_smoother_ ? "enabled" : "disabled", smoother_window_, smoother_lag_);
 
     print_parameters(motor_params,
                      process_noise_cov,
@@ -185,6 +205,11 @@ void CkfNode::print_parameters(const SecondOrderMotorParams motor_params,
     RCLCPP_INFO(this->get_logger(), "  Measurement Noise Covariance: %.5f", measurement_noise_cov);
     RCLCPP_INFO(this->get_logger(), "  Initial State Covariance: [%.5f, %.5f]", initial_cov(0,0), initial_cov(1,1));
     RCLCPP_INFO(this->get_logger(), "  Estimation Rate: %.2f Hz", estimation_rate);
+
+    RCLCPP_INFO(this->get_logger(), "RTS Smoother:");
+    RCLCPP_INFO(this->get_logger(), "  Enabled: %s", use_smoother_ ? "true" : "false");
+    RCLCPP_INFO(this->get_logger(), "  Window Size: %d", smoother_window_);
+    RCLCPP_INFO(this->get_logger(), "  Lag: %d", smoother_lag_);
     RCLCPP_INFO(this->get_logger(), "--------------------------------");
 }
 
@@ -253,18 +278,53 @@ void CkfNode::estimate_rotor_states()
 
     for (size_t i = 0; i < 6; ++i)
     {
-        // Prediction step
+        // Forward CKF step: predict + update
         ckf_[i]->predict(cmd_med(i), dt);
-
-        // Update step with the most recent RPM measurement
         ckf_[i]->update(rpm_recent.rpm(i));
 
-        // Store estimated states and covariances
-        state_est_(i) = ckf_[i]->get_state_estimate()(0);          // Rotor speed
-        state_est_(i + 6) = ckf_[i]->get_state_estimate()(1);      // Rotor acceleration
+        if (use_smoother_ && rts_smoother_[i] != nullptr)
+        {
+            // Store forward-pass intermediates for RTS smoother
+            CkfStepResult step_result;
+            step_result.x_filt = ckf_[i]->get_state_estimate();
+            step_result.P_filt = ckf_[i]->get_covariance_estimate();
+            step_result.x_pred = ckf_[i]->get_predicted_state();
+            step_result.P_pred = ckf_[i]->get_predicted_covariance();
+            step_result.A      = ckf_[i]->get_transition_matrix();
 
-        state_cov_diag_(i) = ckf_[i]->get_covariance_estimate()(0, 0);      // Rotor speed variance
-        state_cov_diag_(i + 6) = ckf_[i]->get_covariance_estimate()(1, 1);  // Rotor acceleration variance
+            rts_smoother_[i]->push_result(step_result);
+
+            // Run RTS backward pass and use smoothed estimate
+            if (rts_smoother_[i]->ready(static_cast<size_t>(smoother_lag_) + 1))
+            {
+                rts_smoother_[i]->smooth();
+                Vector2d x_s = rts_smoother_[i]->get_smoothed_state(
+                    static_cast<size_t>(smoother_lag_));
+                Matrix2x2d P_s = rts_smoother_[i]->get_smoothed_covariance(
+                    static_cast<size_t>(smoother_lag_));
+
+                state_est_(i)     = x_s(0);
+                state_est_(i + 6) = x_s(1);
+                state_cov_diag_(i)     = P_s(0, 0);
+                state_cov_diag_(i + 6) = P_s(1, 1);
+            }
+            else
+            {
+                // Not enough samples yet; use filtered estimate
+                state_est_(i)     = ckf_[i]->get_state_estimate()(0);
+                state_est_(i + 6) = ckf_[i]->get_state_estimate()(1);
+                state_cov_diag_(i)     = ckf_[i]->get_covariance_estimate()(0, 0);
+                state_cov_diag_(i + 6) = ckf_[i]->get_covariance_estimate()(1, 1);
+            }
+        }
+        else
+        {
+            // No smoother; use filtered estimate directly
+            state_est_(i)     = ckf_[i]->get_state_estimate()(0);
+            state_est_(i + 6) = ckf_[i]->get_state_estimate()(1);
+            state_cov_diag_(i)     = ckf_[i]->get_covariance_estimate()(0, 0);
+            state_cov_diag_(i + 6) = ckf_[i]->get_covariance_estimate()(1, 1);
+        }
     }
 
 }

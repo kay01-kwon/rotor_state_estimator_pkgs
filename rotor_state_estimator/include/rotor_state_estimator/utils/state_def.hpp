@@ -47,4 +47,14 @@ struct SingleRpmData
     double rpm{0.0};
 };
 
+// Forward-pass result stored for RTS smoother backward pass
+struct CkfStepResult
+{
+    Vector2d x_filt{Vector2d::Zero()};      // Filtered state (after update)
+    Matrix2x2d P_filt{Matrix2x2d::Zero()};  // Filtered covariance (after update)
+    Vector2d x_pred{Vector2d::Zero()};      // Predicted state (before update)
+    Matrix2x2d P_pred{Matrix2x2d::Zero()};  // Predicted covariance (before update)
+    Matrix2x2d A{Matrix2x2d::Zero()};       // Linearized state transition matrix
+};
+
 #endif // STATE_DEF_HPP
