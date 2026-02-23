@@ -243,6 +243,10 @@ def run_single(node):
     ax_acc.set_xlabel("Time [s]")
     ax_acc.legend(loc="upper left", fontsize=9)
 
+    # Disable x-axis autoscaling — we control xlim manually
+    for ax in (ax_rpm, ax_acc):
+        ax.autoscale(enable=False, axis="x")
+
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fill = {"rpm": None, "acc": None}
 
@@ -309,6 +313,11 @@ def run_hexa(node):
     axes[0, 1].set_title("Acceleration  (est + 3σ)", fontsize=10)
     axes[-1, 0].set_xlabel("Time [s]", fontsize=9)
     axes[-1, 1].set_xlabel("Time [s]", fontsize=9)
+
+    # Disable x-axis autoscaling — we control xlim manually
+    for ax in axes.flatten():
+        ax.autoscale(enable=False, axis="x")
+
     fig.tight_layout(rect=[0, 0, 1, 0.96])
 
     def update(_):
