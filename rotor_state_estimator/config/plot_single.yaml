@@ -1,0 +1,9 @@
+/**:
+  ros__parameters:
+    mode: "single"
+    max_points: 500
+
+    topics:
+      actual_rpm: "/uav/actual_rpm"
+      estimated_state: "/uav/single_rotor_state"
+      estimated_cov: "/uav/single_rotor_state_covariance"
