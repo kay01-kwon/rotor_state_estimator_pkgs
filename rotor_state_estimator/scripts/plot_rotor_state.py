@@ -7,6 +7,8 @@ Supports two modes via the 'mode' parameter:
   - "hexa"   : six rotors (HexaActualRpm + RotorCov)  — 6x2 grid
 """
 
+import threading
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
@@ -242,6 +244,10 @@ def _compute_ylim(*data_deques):
 #  Single-rotor main loop
 # ====================================================================
 def run_single(node):
+    # Spin in a background thread so ALL messages are consumed in real-time
+    spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    spin_thread.start()
+
     fig, (ax_rpm, ax_acc) = plt.subplots(2, 1, figsize=(12, 7))
     fig.suptitle("Single Rotor — RTS Smoother", fontsize=14)
 
@@ -266,7 +272,8 @@ def run_single(node):
     fill = {"rpm": None, "acc": None}
 
     def update(_):
-        rclpy.spin_once(node, timeout_sec=0.0)
+        # Messages are consumed by the background spin thread.
+        # This function only reads from the deques (thread-safe in CPython).
 
         if node.t_meas:
             ln_meas.set_data(list(node.t_meas), list(node.rpm_meas))
@@ -308,6 +315,10 @@ def run_single(node):
 #  6 rows x 2 cols:  left = RPM + 3sigma,  right = Accel + 3sigma
 # ====================================================================
 def run_hexa(node):
+    # Spin in a background thread so ALL messages are consumed in real-time
+    spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    spin_thread.start()
+
     fig, axes = plt.subplots(NUM_ROTORS, 2, figsize=(16, 14))
     fig.suptitle("Hexacopter Rotors — RTS Smoother", fontsize=14)
 
@@ -346,7 +357,7 @@ def run_hexa(node):
     fig.tight_layout(rect=[0, 0, 1, 0.96])
 
     def update(_):
-        rclpy.spin_once(node, timeout_sec=0.0)
+        # Messages are consumed by the background spin thread.
 
         t_m = list(node.t_meas)
         t_e = list(node.t_est)
