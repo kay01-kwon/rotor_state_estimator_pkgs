@@ -199,8 +199,27 @@ def _update_fill(ax, t_est, y_est, t_cov, sigma, color, fill_handle):
             color=color, alpha=0.15)
 
     ax.relim()
-    ax.autoscale_view()
+    ax.autoscale_view(scalex=False, scaley=True)
     return fill_handle
+
+
+def _set_xlim_from_deques(axes_list, *time_deques):
+    """Set shared x-limits from the oldest/newest entries across time deques."""
+    t_min = None
+    t_max = None
+    for td in time_deques:
+        if len(td) > 0:
+            lo = td[0]
+            hi = td[-1]
+            if t_min is None or lo < t_min:
+                t_min = lo
+            if t_max is None or hi > t_max:
+                t_max = hi
+
+    if t_min is not None and t_max is not None:
+        margin = max((t_max - t_min) * 0.02, 0.05)
+        for ax in axes_list:
+            ax.set_xlim(t_min - margin, t_max + margin)
 
 
 # ====================================================================
@@ -243,6 +262,9 @@ def run_single(node):
         fill["acc"] = _update_fill(
             ax_acc, node.t_est, node.accel_est,
             node.t_cov, node.sig_acc, "tab:orange", fill["acc"])
+
+        _set_xlim_from_deques([ax_rpm, ax_acc],
+                              node.t_meas, node.t_est, node.t_cov)
 
         return ln_meas, ln_est, ln_acc
 
@@ -311,6 +333,9 @@ def run_hexa(node):
                 axes[i, 1], node.t_est, node.accel_est[i],
                 node.t_cov, node.sig_acc[i],
                 COLORS[i], fill_acc[i])
+
+        _set_xlim_from_deques(axes.flatten().tolist(),
+                              node.t_meas, node.t_est, node.t_cov)
 
         return ln_meas_rpm + ln_est_rpm + ln_est_acc
 
