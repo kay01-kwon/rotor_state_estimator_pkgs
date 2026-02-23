@@ -198,36 +198,51 @@ def _update_fill(ax, t_est, y_est, t_cov, sigma, color, fill_handle):
             y_e[-n:] + 3.0 * sig[-n:],
             color=color, alpha=0.15)
 
-    ax.relim()
-    ax.autoscale_view(scalex=False, scaley=True)
     return fill_handle
 
 
-def _set_xlim_from_deques(axes_list, *time_deques):
-    """Set shared x-limits from the oldest/newest entries across time deques."""
+def _compute_xlim(*time_deques):
+    """Compute x-limits from the oldest/newest entries across time deques."""
     t_min = None
     t_max = None
     for td in time_deques:
         if len(td) > 0:
-            lo = td[0]
-            hi = td[-1]
-            if t_min is None or lo < t_min:
-                t_min = lo
-            if t_max is None or hi > t_max:
-                t_max = hi
-
+            if t_min is None or td[0] < t_min:
+                t_min = td[0]
+            if t_max is None or td[-1] > t_max:
+                t_max = td[-1]
     if t_min is not None and t_max is not None:
         margin = max((t_max - t_min) * 0.02, 0.05)
-        for ax in axes_list:
-            ax.set_xlim(t_min - margin, t_max + margin)
+        return (t_min - margin, t_max + margin)
+    return None
+
+
+def _compute_ylim(*data_deques):
+    """Compute y-limits from multiple data deques with 5% margin."""
+    y_min = None
+    y_max = None
+    for d in data_deques:
+        if len(d) > 0:
+            arr = np.array(d)
+            lo, hi = float(np.nanmin(arr)), float(np.nanmax(arr))
+            if y_min is None or lo < y_min:
+                y_min = lo
+            if y_max is None or hi > y_max:
+                y_max = hi
+    if y_min is not None and y_max is not None:
+        span = y_max - y_min
+        if span < 1e-6:
+            span = 1.0
+        margin = span * 0.05
+        return (y_min - margin, y_max + margin)
+    return None
 
 
 # ====================================================================
 #  Single-rotor main loop
 # ====================================================================
 def run_single(node):
-    fig, (ax_rpm, ax_acc) = plt.subplots(
-        2, 1, figsize=(12, 7), sharex=True)
+    fig, (ax_rpm, ax_acc) = plt.subplots(2, 1, figsize=(12, 7))
     fig.suptitle("Single Rotor — RTS Smoother", fontsize=14)
 
     ln_meas, = ax_rpm.plot([], [], "o", color="gray", ms=5, alpha=0.6,
@@ -243,9 +258,9 @@ def run_single(node):
     ax_acc.set_xlabel("Time [s]")
     ax_acc.legend(loc="upper left", fontsize=9)
 
-    # Disable x-axis autoscaling — we control xlim manually
+    # Disable ALL autoscaling — we set xlim/ylim manually
     for ax in (ax_rpm, ax_acc):
-        ax.autoscale(enable=False, axis="x")
+        ax.set_autoscale_on(False)
 
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fill = {"rpm": None, "acc": None}
@@ -267,8 +282,19 @@ def run_single(node):
             ax_acc, node.t_est, node.accel_est,
             node.t_cov, node.sig_acc, "tab:orange", fill["acc"])
 
-        _set_xlim_from_deques([ax_rpm, ax_acc],
-                              node.t_meas, node.t_est, node.t_cov)
+        # ── manual axis limits ──
+        xlim = _compute_xlim(node.t_meas, node.t_est, node.t_cov)
+        if xlim:
+            ax_rpm.set_xlim(*xlim)
+            ax_acc.set_xlim(*xlim)
+
+        ylim_rpm = _compute_ylim(node.rpm_meas, node.rpm_est)
+        if ylim_rpm:
+            ax_rpm.set_ylim(*ylim_rpm)
+
+        ylim_acc = _compute_ylim(node.accel_est)
+        if ylim_acc:
+            ax_acc.set_ylim(*ylim_acc)
 
         return ln_meas, ln_est, ln_acc
 
@@ -282,8 +308,7 @@ def run_single(node):
 #  6 rows x 2 cols:  left = RPM + 3sigma,  right = Accel + 3sigma
 # ====================================================================
 def run_hexa(node):
-    fig, axes = plt.subplots(
-        NUM_ROTORS, 2, figsize=(16, 14), sharex=True)
+    fig, axes = plt.subplots(NUM_ROTORS, 2, figsize=(16, 14))
     fig.suptitle("Hexacopter Rotors — RTS Smoother", fontsize=14)
 
     ln_meas_rpm = []
@@ -314,9 +339,9 @@ def run_hexa(node):
     axes[-1, 0].set_xlabel("Time [s]", fontsize=9)
     axes[-1, 1].set_xlabel("Time [s]", fontsize=9)
 
-    # Disable x-axis autoscaling — we control xlim manually
+    # Disable ALL autoscaling — we set xlim/ylim manually
     for ax in axes.flatten():
-        ax.autoscale(enable=False, axis="x")
+        ax.set_autoscale_on(False)
 
     fig.tight_layout(rect=[0, 0, 1, 0.96])
 
@@ -343,8 +368,20 @@ def run_hexa(node):
                 node.t_cov, node.sig_acc[i],
                 COLORS[i], fill_acc[i])
 
-        _set_xlim_from_deques(axes.flatten().tolist(),
-                              node.t_meas, node.t_est, node.t_cov)
+        # ── manual axis limits ──
+        xlim = _compute_xlim(node.t_meas, node.t_est, node.t_cov)
+        if xlim:
+            for ax in axes.flatten():
+                ax.set_xlim(*xlim)
+
+        for i in range(NUM_ROTORS):
+            ylim_r = _compute_ylim(node.rpm_meas[i], node.rpm_est[i])
+            if ylim_r:
+                axes[i, 0].set_ylim(*ylim_r)
+
+            ylim_a = _compute_ylim(node.accel_est[i])
+            if ylim_a:
+                axes[i, 1].set_ylim(*ylim_a)
 
         return ln_meas_rpm + ln_est_rpm + ln_est_acc
 
