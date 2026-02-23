@@ -38,10 +38,10 @@ class RotorStatePlotter(Node):
         self.declare_parameter("topics.estimated_cov", "/uav/single_rotor_state_covariance")
         self.declare_parameter("max_points", max_points)
 
-        actual_topic = self.get_parameter("topics.actual_rpm").as_string()
-        est_topic = self.get_parameter("topics.estimated_state").as_string()
-        cov_topic = self.get_parameter("topics.estimated_cov").as_string()
-        self.max_pts = self.get_parameter("max_points").as_int()
+        actual_topic = self.get_parameter("topics.actual_rpm").value
+        est_topic = self.get_parameter("topics.estimated_state").value
+        cov_topic = self.get_parameter("topics.estimated_cov").value
+        self.max_pts = int(self.get_parameter("max_points").value)
 
         # ── Data buffers (deque for O(1) append/pop) ────────────
         self.t_meas = deque(maxlen=self.max_pts)
