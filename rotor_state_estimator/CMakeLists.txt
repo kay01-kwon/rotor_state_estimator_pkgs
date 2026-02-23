@@ -87,4 +87,9 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+  PROGRAMS scripts/plot_rotor_state.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
