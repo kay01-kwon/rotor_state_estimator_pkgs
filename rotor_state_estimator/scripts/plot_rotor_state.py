@@ -4,7 +4,7 @@ Real-time plotter for rotor state estimation with 3-sigma bounds.
 
 Supports two modes via the 'mode' parameter:
   - "single" : one rotor  (SingleActualRpm + SingleRotorCov)
-  - "hexa"   : six rotors (HexaActualRpm + RotorCov)  — 3x2 grid
+  - "hexa"   : six rotors (HexaActualRpm + RotorCov)  — 6x2 grid
 """
 
 import rclpy
@@ -177,9 +177,8 @@ class HexaRotorPlotterNode(Node):
 # ====================================================================
 #  Plotting helpers
 # ====================================================================
-def _update_single_subplot(ax, t_est, y_est, t_meas, y_meas,
-                           t_cov, sigma, color, fill_handle):
-    """Return new fill_handle (or None)."""
+def _update_fill(ax, t_est, y_est, t_cov, sigma, color, fill_handle):
+    """Redraw 3-sigma band. Return new fill_handle (or None)."""
     if fill_handle is not None:
         fill_handle.remove()
         fill_handle = None
@@ -212,7 +211,7 @@ def run_single(node):
         2, 1, figsize=(12, 7), sharex=True)
     fig.suptitle("Single Rotor — RTS Smoother", fontsize=14)
 
-    ln_meas, = ax_rpm.plot([], [], "o", color="gray", ms=2, alpha=0.5,
+    ln_meas, = ax_rpm.plot([], [], "o", color="gray", ms=5, alpha=0.6,
                            label="Measured")
     ln_est,  = ax_rpm.plot([], [], "-", color="tab:blue", lw=1.5,
                            label="Estimated")
@@ -237,14 +236,12 @@ def run_single(node):
             ln_est.set_data(list(node.t_est), list(node.rpm_est))
             ln_acc.set_data(list(node.t_est), list(node.accel_est))
 
-        fill["rpm"] = _update_single_subplot(
+        fill["rpm"] = _update_fill(
             ax_rpm, node.t_est, node.rpm_est,
-            node.t_meas, node.rpm_meas,
             node.t_cov, node.sig_rpm, "tab:blue", fill["rpm"])
 
-        fill["acc"] = _update_single_subplot(
+        fill["acc"] = _update_fill(
             ax_acc, node.t_est, node.accel_est,
-            None, None,
             node.t_cov, node.sig_acc, "tab:orange", fill["acc"])
 
         return ln_meas, ln_est, ln_acc
@@ -255,27 +252,41 @@ def run_single(node):
 
 
 # ====================================================================
-#  Hexa-rotor main loop  (3 rows x 2 cols = 6 RPM subplots)
+#  Hexa-rotor main loop
+#  6 rows x 2 cols:  left = RPM + 3sigma,  right = Accel + 3sigma
 # ====================================================================
 def run_hexa(node):
-    fig, axes = plt.subplots(3, 2, figsize=(14, 10), sharex=True)
+    fig, axes = plt.subplots(
+        NUM_ROTORS, 2, figsize=(16, 14), sharex=True)
     fig.suptitle("Hexacopter Rotors — RTS Smoother", fontsize=14)
-    axes_flat = axes.flatten()  # [0..5]
 
-    lines_meas = []
-    lines_est  = []
-    fills = [None] * NUM_ROTORS
+    ln_meas_rpm = []
+    ln_est_rpm  = []
+    ln_est_acc  = []
+    fill_rpm    = [None] * NUM_ROTORS
+    fill_acc    = [None] * NUM_ROTORS
 
-    for i, ax in enumerate(axes_flat):
-        lm, = ax.plot([], [], "o", color="gray", ms=1.5, alpha=0.4)
-        le, = ax.plot([], [], "-", color=COLORS[i], lw=1.3)
-        ax.set_ylabel(f"R{i} RPM", fontsize=9)
-        ax.tick_params(labelsize=8)
-        lines_meas.append(lm)
-        lines_est.append(le)
+    for i in range(NUM_ROTORS):
+        ax_r = axes[i, 0]  # RPM column
+        ax_a = axes[i, 1]  # Accel column
 
-    axes_flat[-2].set_xlabel("Time [s]", fontsize=9)
-    axes_flat[-1].set_xlabel("Time [s]", fontsize=9)
+        lm, = ax_r.plot([], [], "o", color="gray", ms=4, alpha=0.5)
+        le, = ax_r.plot([], [], "-", color=COLORS[i], lw=1.3)
+        la, = ax_a.plot([], [], "-", color=COLORS[i], lw=1.3)
+
+        ax_r.set_ylabel(f"R{i} RPM", fontsize=8)
+        ax_a.set_ylabel(f"R{i} Acc", fontsize=8)
+        ax_r.tick_params(labelsize=7)
+        ax_a.tick_params(labelsize=7)
+
+        ln_meas_rpm.append(lm)
+        ln_est_rpm.append(le)
+        ln_est_acc.append(la)
+
+    axes[0, 0].set_title("RPM  (meas + est + 3σ)", fontsize=10)
+    axes[0, 1].set_title("Acceleration  (est + 3σ)", fontsize=10)
+    axes[-1, 0].set_xlabel("Time [s]", fontsize=9)
+    axes[-1, 1].set_xlabel("Time [s]", fontsize=9)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
 
     def update(_):
@@ -286,17 +297,22 @@ def run_hexa(node):
 
         for i in range(NUM_ROTORS):
             if t_m:
-                lines_meas[i].set_data(t_m, list(node.rpm_meas[i]))
+                ln_meas_rpm[i].set_data(t_m, list(node.rpm_meas[i]))
             if t_e:
-                lines_est[i].set_data(t_e, list(node.rpm_est[i]))
+                ln_est_rpm[i].set_data(t_e, list(node.rpm_est[i]))
+                ln_est_acc[i].set_data(t_e, list(node.accel_est[i]))
 
-            fills[i] = _update_single_subplot(
-                axes_flat[i], node.t_est, node.rpm_est[i],
-                node.t_meas, node.rpm_meas[i],
+            fill_rpm[i] = _update_fill(
+                axes[i, 0], node.t_est, node.rpm_est[i],
                 node.t_cov, node.sig_rpm[i],
-                COLORS[i], fills[i])
+                COLORS[i], fill_rpm[i])
 
-        return lines_meas + lines_est
+            fill_acc[i] = _update_fill(
+                axes[i, 1], node.t_est, node.accel_est[i],
+                node.t_cov, node.sig_acc[i],
+                COLORS[i], fill_acc[i])
+
+        return ln_meas_rpm + ln_est_rpm + ln_est_acc
 
     _ = FuncAnimation(fig, update, interval=50,
                       blit=False, cache_frame_data=False)
